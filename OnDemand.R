@@ -4,7 +4,8 @@ DATASET = iris               #Mudar isso para ser mais genérico
 NCOLLUMS <- ncol(DATASET)    #Retorna númedo de colunas do dataset
 NATTRIBUTES <- NCOLLUMS -1   #Calcula quantidade de atributos
 INITNUMBER <- 15             #mudar isso para ser mais genérico(algo mais automático)  
-MAX_NUMBER_MC <- 10           #verificar um jeito mais generico (algo mais automático)  
+MAX_NUMBER_MC <- 10          #verificar um jeito mais generico (algo mais automático)  
+MC_ID = 0                    #contador de id do microgrupo
 #Primeiro Pegar do fluxo e depois splitar!
 
 #FUNCÕES---------------------------------------------------------
@@ -47,6 +48,18 @@ set.seed(2)
 #Não consigo agrupar em k grupos onde k é o número de observacoes, WHY?!!
 #verificar de mudar esse nstart!
 splittedMicroClusters <- lapply(splittedPoints, function(classSet){kmeans(classSet[, 1:NATTRIBUTES], maxInitMicroClusters-1, nstart = 5)}) 
+
+#TODO
+#criar data frame de todos os micro-grupos(lista de micro-grupos) e adicionar campo id e área de limite máximo
+#(id_micro-grupo, centro, area de limite maximo,CF2x,CF1x,CF2t,CF1t,class_id)
+#criar funcao de distancia euclidiana
+#calcular o limite max de área para cada microgrupo
+
+splittedMicroClusters[["setosa"]]$centers
+
+
+
+
 
 #Fase 2 - Manutencão ONLINE
 

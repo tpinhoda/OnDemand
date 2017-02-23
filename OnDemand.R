@@ -1,13 +1,15 @@
 library(stream)
 #----------------------------------------------------------------
-dataset = iris               #Mudar isso
-NCOLLUMS <- ncol(dataset)    #Retorna númedo de colunas do dataset
+DATASET = iris               #Mudar isso para ser mais genérico
+NCOLLUMS <- ncol(DATASET)    #Retorna númedo de colunas do dataset
 NATTRIBUTES <- NCOLLUMS -1   #Calcula quantidade de atributos
-
+INITNUMBER <- 15             #mudar isso para ser mais genérico(algo mais automático)  
+MAX_NUMBER_MC <- 10           #verificar um jeito mais generico (algo mais automático)  
+#Primeiro Pegar do fluxo e depois splitar!
 
 #FUNCÕES---------------------------------------------------------
 splitByClass <- function(dataset){
-  classList <-dataset[,NCOLLUMS]
+  classList <-dataset[,ncol(dataset)]
   splittedDF <- split(dataset,classList)
   return(splittedDF)
 }
@@ -21,4 +23,30 @@ createDataStream <- function(dataset){
 }
 
 
+
+#Fase 1 - Inicializacão - OFFLINE
+
+#O dataset iris precisa ser randomizado para que possa vir dados de mais de um classe no inicio da stream 
+set.seed(1) #verificar melhor o set seed!!
+DATASET <- DATASET[sample(nrow(DATASET)),]
+
+#Criar fluxo de dados
+DATASTREAM <- createDataStream(DATASET)
+
+#Dividir os INITNUMBER primeiros pontos do fluxo por classe
+firstPoints <- get_points(DATASTREAM, n = INITNUMBER, class = TRUE) #Obtem os INITNUMBER primeiros pontos do fluxo
+splittedPoints <- splitByClass(firstPoints)           #divide os pontos por classe
+
+#Pegar o grupo com menor quantidade de pontos para ser a quantidade de micro-grupos iniciais para cada classe
+classSetLength <-  lapply(splittedPoints, function(classSet) {nrow(classSet)})
+maxInitMicroClusters = as.numeric(classSetLength[which.min(classSetLength)])
+
+#Utilizar o kmeans em cada grupo de classe e retornar k microgrupos para cada classe
+
+set.seed(2)
+#Não consigo agrupar em k grupos onde k é o número de observacoes, WHY?!!
+#verificar de mudar esse nstart!
+splittedMicroClusters <- lapply(splittedPoints, function(classSet){kmeans(classSet[, 1:NATTRIBUTES], maxInitMicroClusters-1, nstart = 5)}) 
+
+#Fase 2 - Manutencão ONLINE
 

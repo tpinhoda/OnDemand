@@ -43,7 +43,6 @@ classSetLength <-  lapply(splittedPoints, function(classSet) {nrow(classSet)})
 maxInitMicroClusters = as.numeric(classSetLength[which.min(classSetLength)])
 
 #Utilizar o kmeans em cada grupo de classe e retornar k microgrupos para cada classe
-
 set.seed(2)
 #Não consigo agrupar em k grupos onde k é o número de observacoes, WHY?!!
 #verificar de mudar esse nstart!
@@ -51,11 +50,21 @@ splittedMicroClusters <- lapply(splittedPoints, function(classSet){kmeans(classS
 
 #TODO
 #criar data frame de todos os micro-grupos(lista de micro-grupos) e adicionar campo id e área de limite máximo
-#(id_micro-grupo, centro, area de limite maximo,CF2x,CF1x,CF2t,CF1t,class_id)
-#criar funcao de distancia euclidiana
+#(id_micro-grupo, area de limite maximo,CF2x,CF1x,CF2t,CF1t,class_id)
+#criar funcao de distancia euclidiana(verificar se tem uma pronta)!
 #calcular o limite max de área para cada microgrupo
 
-splittedMicroClusters[["setosa"]]$centers
+MICROCLUSTERS <- sapply(splittedMicroClusters, function(classSetMC){
+                                                       apply(classSetMC$centers,1,function(center){
+                                                                                           CF1x <- center
+                                                                                           CF2x <- center^2
+                                                                                           CF1t <- 0
+                                                                                           CF2t <- CF1t^2
+                                                                                           n <- 1
+                                                                                           list(CF1x=CF1x,CF2x=CF2x,CF1t=CF1t,CF2t=CF2t,n=n)
+                                                                                                 
+                                                                                 })
+                                                })
 
 
 

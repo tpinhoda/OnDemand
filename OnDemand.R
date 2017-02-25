@@ -5,7 +5,8 @@ NCOLLUMS <- ncol(DATASET)    #Retorna númedo de colunas do dataset
 NATTRIBUTES <- NCOLLUMS -1   #Calcula quantidade de atributos
 INITNUMBER <- 15             #mudar isso para ser mais genérico(algo mais automático)  
 MAX_NUMBER_MC <- 10          #verificar um jeito mais generico (algo mais automático)  
-MC_ID = 0                    #contador de id do microgrupo
+MC_ID <- 0                   #contador de id do microgrupo
+RADIO <- 2                    #multiplica pela distancia do micro-grupo mais proximo para definir o limite maximo do micro-grupo inicial
 #Primeiro Pegar do fluxo e depois splitar!
 
 #FUNCÕES---------------------------------------------------------
@@ -48,12 +49,8 @@ set.seed(2)
 #verificar de mudar esse nstart!
 splittedMicroClusters <- lapply(splittedPoints, function(classSet){kmeans(classSet[, 1:NATTRIBUTES], maxInitMicroClusters-1, nstart = 5)}) 
 
-#TODO
-#criar data frame de todos os micro-grupos(lista de micro-grupos) e adicionar campo id e área de limite máximo
-#(id_micro-grupo, area de limite maximo,CF2x,CF1x,CF2t,CF1t,class_id)
-#criar funcao de distancia euclidiana(verificar se tem uma pronta)!
-#calcular o limite max de área para cada microgrupo
 
+#Cria estrutura de micro-grupos
 MICROCLUSTERS <- sapply(splittedMicroClusters, function(classSetMC){
                                                        apply(classSetMC$centers,1,function(center){
                                                                                            CF1x <- center
@@ -62,12 +59,30 @@ MICROCLUSTERS <- sapply(splittedMicroClusters, function(classSetMC){
                                                                                            CF2t <- CF1t^2
                                                                                            n <- 1
                                                                                            list(CF1x=CF1x,CF2x=CF2x,CF1t=CF1t,CF2t=CF2t,n=n)
+                                                                                           
                                                                                                  
                                                                                  })
                                                 })
 
+#==============================TRANSFORMAR EM FUNCAO===========================================================================================
+#Calculo do limite maximo de cada micro-grupo
+
+#criar lista de centros
+microClustersCenters <- sapply(MICROCLUSTERS, function(microcluster){
+                                                      data.frame(microcluster[1])
+                                              })
+
+#Calcula a distancia entre os micro-grupos
+DistCenters <- dist(microClustersCenters)
+DistCenters <- as.matrix(DistCenters)
+rownames(DistCenters) <- c(1:length(MICROCLUSTERS))
+colnames(DistCenters) <- c(1:length(MICROCLUSTERS))
 
 
+MAXBOUNDARIES <- RADIO*apply(DistCenters,1,function(microClusterDists){
+                                        c(min( microClusterDists[microClusterDists!=min(microClusterDists)] ))    
+                                     }) 
+#==============================================================================================================================================
 
 
 #Fase 2 - Manutencão ONLINE

@@ -15,7 +15,7 @@ MAX_ITERATIONS <- 10
 
 #Primeiro Pegar do fluxo e depois splitar!
 
-#FUNCÕES---------------------------------------------------------
+#============================================FUNCÕES============================================================================
 splitByClass <- function(dataset){
   classList <-dataset[,ncol(dataset)]
   splittedDF <- split(dataset,classList)
@@ -27,7 +27,6 @@ createDataStream <- function(dataset){
   stream <- DSD_Memory(dataset[,c(1:NATTRIBUTES)], class=dataset[,NCOLLUMS], loop = TRUE) #Cria o fluxo a partir do dataset escolhido 
   return(stream)
   #Caso queira um fluxo infinito mude o atributo loop para TRUE
-  #--------------------------------------------------------------------------------------------------------------------
 }
 
 getCenters <- function(MICROCLUSTERS){
@@ -45,7 +44,25 @@ addPoint <- function(microClusterIndex,point){
  
 }
 
+createMicroCluster <- function(center,class){
+  MC_ID <<- MC_ID + 1
+  return(list(CF1x=center,CF2x=center^2,CF1t=0,CF2t=0,n=1,class_id=class,id=MC_ID))
+}
 
+distBetweenMicroClusters <- function(MICROCLUSTERS){
+  microClustersCenters <- getCenters(MICROCLUSTERS)
+
+    #Calcula a distancia entre os micro-grupos
+  DistCenters <- dist(microClustersCenters)
+  DistCenters <- as.matrix(DistCenters)
+  
+  rownames(DistCenters) <- c(1:length(MICROCLUSTERS))
+  colnames(DistCenters) <- c(1:length(MICROCLUSTERS))
+  
+  return(DistCenters)
+}
+  
+#========================================INÍCIO=======================================================================
 #Fase 1 - Inicializacão - OFFLINE
 
 #O dataset iris precisa ser randomizado para que possa vir dados de mais de um classe no inicio da stream 
@@ -67,37 +84,20 @@ maxInitMicroClusters = as.numeric(classSetLength[which.min(classSetLength)])
 set.seed(2)
 #Não consigo agrupar em k grupos onde k é o número de observacoes, WHY?!!
 #verificar de mudar esse nstart!
-splittedMicroClusters <- lapply(splittedPoints, function(classSet){list(clusters = kmeans(classSet[, 1:NATTRIBUTES], maxInitMicroClusters-1, nstart = 5),class=as.character(classSet[1,NCOLLUMS]))}) 
-
+splittedMicroClusters <- lapply(splittedPoints, function(classSet){c(kmeans(classSet[, 1:NATTRIBUTES], maxInitMicroClusters-1, nstart = 5),class=as.character(classSet[1,NCOLLUMS]))}) 
 
 #Cria estrutura de micro-grupos
 MICROCLUSTERS <- sapply(splittedMicroClusters, function(classSetMC){
-                                    
-                                                       apply(classSetMC$clusters$centers,1,function(center){
-                                                                                           CF1x <- center
-                                                                                           CF2x <- center^2
-                                                                                           CF1t <- 0
-                                                                                           CF2t <- CF1t^2
-                                                                                           n <- 1
-                                                                                           class_id = classSetMC$class
-                                                                                           MC_ID <<- MC_ID + 1
-                                                                                           list(CF1x=CF1x,CF2x=CF2x,CF1t=CF1t,CF2t=CF2t,n=n,class_id=class_id,id=MC_ID)
-                                                                                           
-                                                                                                 
-                                                                                 })
-                                                })
+                                                           apply(classSetMC$centers,1,function(center){
+                                                                                       createMicroCluster(center,classSetMC$class)
+                                  ''                                                    })                           
+                                                
+                                              })
 
-
-#Calculo do limite maximo de cada micro-grupo
+#Calculo do limite maximo de cada micro-grupo inicial
 
 #criar lista de centros
-microClustersCenters <- getCenters(MICROCLUSTERS)
-
-#Calcula a distancia entre os micro-grupos
-DistCenters <- dist(microClustersCenters)
-DistCenters <- as.matrix(DistCenters)
-rownames(DistCenters) <- c(1:length(MICROCLUSTERS))
-colnames(DistCenters) <- c(1:length(MICROCLUSTERS))
+DistCenters <- distBetweenMicroClusters(MICROCLUSTERS)
 
 
 MAXBOUNDARIES <- t*apply(DistCenters,1,function(microClusterDists){
@@ -108,7 +108,6 @@ MAXBOUNDARIES <- t*apply(DistCenters,1,function(microClusterDists){
 
 #Fase 2 - Manutencão ONLINE
 
-#mudar para n = h, onde h é o tamanho da janela!
 time <- 0
 STOP_ITERATIONS <- 0
 while(!STOP_ITERATIONS){
@@ -118,7 +117,7 @@ while(!STOP_ITERATIONS){
         STOP_ITERATIONS = 1;
       }
       
-      newPoints <- get_points(DATASTREAM, n = POINTS_PER_UNIT_TIME, class = TRUE)     #Recebe novos pontos
+      newPoints <- get_points(DATASTREAM, n = POINTS_PER_UNIT_TIME, class = TRUE)         #Recebe novos pontos
       for(indexPoint in 1:nrow(newPoints)-kfit){
           newPoint <- newPoints[indexPoint,1:NATTRIBUTES]
           microClustersCenters <- getCenters(MICROCLUSTERS)                               #Recupera os centros CF1x/n de todos os microclusters
@@ -139,8 +138,9 @@ while(!STOP_ITERATIONS){
              if(t*rmsd >= minDist){
                addPoint(as.numeric(minDistIndex),newPoint)
              }else{
-               #Cria novo microgrupo
-               
+               #deleta ou junta microgrupos
+            
+                 
              }
           }
       }
@@ -148,7 +148,7 @@ while(!STOP_ITERATIONS){
       #verifica se faz a parte offline so seguir no indexPOint
 }
 
-MIC
+
 
 
 # MICROCLUSTERS[[1]]$CF1x para acessar membros da lista 

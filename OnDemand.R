@@ -10,9 +10,10 @@ MC_ID <- 0                   #contador de id do microgrupo
 t <- 2                       #multiplica pela distancia do micro-grupo mais proximo para definir o limite maximo do micro-grupo inicial
 h <- 10                      #Tamanho da janela de tempo que será processada
 kfit <- h*0.1                #Quantidade de pontos que serão testadas
-POINTS_PER_UNIT_TIME <- 1    #Pontos que chegarao a cada 1 unidade de tempo
+m <- 10
+POINTS_PER_UNIT_TIME <- 2    #Pontos que chegarao a cada 1 unidade de tempo
 MAX_ITERATIONS <- 10
-
+phi <- 0.5
 #Primeiro Pegar do fluxo e depois splitar!
 
 #============================================FUNCÕES============================================================================
@@ -24,7 +25,7 @@ splitByClass <- function(dataset){
 
 createDataStream <- function(dataset){
   #Transformar um data set em um fluxo
-  stream <- DSD_Memory(dataset[,c(1:NATTRIBUTES)], class=dataset[,NCOLLUMS], loop = TRUE) #Cria o fluxo a partir do dataset escolhido 
+  stream <- DSD_Memory(dataset[,c(1:NATTRIBUTES)], class=dataset[,NCOLLUMS], loop = FALSE) #Cria o fluxo a partir do dataset escolhido 
   return(stream)
   #Caso queira um fluxo infinito mude o atributo loop para TRUE
 }
@@ -39,7 +40,7 @@ addPoint <- function(microClusterIndex,point){
   MICROCLUSTERS[[microClusterIndex]]$CF1x <<- MICROCLUSTERS[[microClusterIndex]]$CF1x + point
   MICROCLUSTERS[[microClusterIndex]]$CF2x <<- MICROCLUSTERS[[microClusterIndex]]$CF2x + point^2
   MICROCLUSTERS[[microClusterIndex]]$CF1t <<- MICROCLUSTERS[[microClusterIndex]]$CF1t + 1
-  MICROCLUSTERS[[microClusterIndex]]$CF2t <<- MICROCLUSTERS[[microClusterIndex]]$CF2t + 1
+  MICROCLUSTERS[[microClusterIndex]]$CF2t <<- MICROCLUSTERS[[microClusterIndex]]$CF2t + 1^2
   MICROCLUSTERS[[microClusterIndex]]$n <<- MICROCLUSTERS[[microClusterIndex]]$n + 1
  
 }
@@ -61,7 +62,38 @@ distBetweenMicroClusters <- function(MICROCLUSTERS){
   
   return(DistCenters)
 }
+
+calculateMeanTimeStamp <- function(microcluster){
+  meanTimeStamp <- microcluster$CF1t/microcluster$n
+  stdTimeStamp <- sqrt((microcluster$CF2t/microcluster$n)-(microcluster$CF1t/microcluster$n)^2)
   
+  if(microcluster$n < 2*m)
+    return(meanTimeStamp)
+  else{
+    
+    return(qnorm(((m-1)/(2*microcluster$n)),meanTimeStamp,stdTimeStamp))
+  }  
+}
+
+deleteMicroCluster <- function(microClusterIndex,point,class){
+  MICROCLUSTERS[[microClusterIndex]]$CF1x <<-  point
+  MICROCLUSTERS[[microClusterIndex]]$CF2x <<-  point^2
+  MICROCLUSTERS[[microClusterIndex]]$CF1t <<-  0
+  MICROCLUSTERS[[microClusterIndex]]$CF2t <<-  0
+  MICROCLUSTERS[[microClusterIndex]]$n <<-  1
+  MICROCLUSTERS[[microClusterIndex]]$class_id <<- class
+  MC_ID <<- MC_ID + 1
+  MICROCLUSTERS[[microClusterIndex]]$id <<- MC_ID
+}
+
+mergeMicroClusters <- function(mc1,mc2){
+  MICROCLUSTERS[[mc1]]$CF1x <<-  MICROCLUSTERS[[mc1]]$CF1x + MICROCLUSTERS[[mc2]]$CF2x
+  MICROCLUSTERS[[mc1]]$CF2x <<-  MICROCLUSTERS[[mc1]]$CF2x + MICROCLUSTERS[[mc2]]$CF2x   
+  MICROCLUSTERS[[mc1]]$CF1t <<-  MICROCLUSTERS[[mc1]]$CF1t + MICROCLUSTERS[[mc2]]$CF1t
+  MICROCLUSTERS[[mc1]]$CF2t <<-  MICROCLUSTERS[[mc1]]$CF2t + MICROCLUSTERS[[mc2]]$CF2t
+  MICROCLUSTERS[[mc1]]$n <<-  MICROCLUSTERS[[mc1]]$n + MICROCLUSTERS[[mc2]]$n  
+  MICROCLUSTERS[[mc1]]$id <<- c(MICROCLUSTERS[[mc1]]$id,MICROCLUSTERS[[mc2]]$id )
+}
 #========================================INÍCIO=======================================================================
 #Fase 1 - Inicializacão - OFFLINE
 
@@ -89,8 +121,8 @@ splittedMicroClusters <- lapply(splittedPoints, function(classSet){c(kmeans(clas
 #Cria estrutura de micro-grupos
 MICROCLUSTERS <- sapply(splittedMicroClusters, function(classSetMC){
                                                            apply(classSetMC$centers,1,function(center){
-                                                                                       createMicroCluster(center,classSetMC$class)
-                                  ''                                                    })                           
+                                                                                         createMicroCluster(center,classSetMC$class)
+                                                                                 })                           
                                                 
                                               })
 
@@ -111,41 +143,67 @@ MAXBOUNDARIES <- t*apply(DistCenters,1,function(microClusterDists){
 time <- 0
 STOP_ITERATIONS <- 0
 while(!STOP_ITERATIONS){
-      time <- time +1
-      if(DATASTREAM$state$counter+POINTS_PER_UNIT_TIME >= DATASET_SIZE){
-        POINTS_PER_UNIT_TIME <- DATASET_SIZE - DATASTREAM$state$counter 
-        STOP_ITERATIONS = 1;
-      }
+      for(time in 1:h-kfit){
       
-      newPoints <- get_points(DATASTREAM, n = POINTS_PER_UNIT_TIME, class = TRUE)         #Recebe novos pontos
-      for(indexPoint in 1:nrow(newPoints)-kfit){
-          newPoint <- newPoints[indexPoint,1:NATTRIBUTES]
-          microClustersCenters <- getCenters(MICROCLUSTERS)                               #Recupera os centros CF1x/n de todos os microclusters
-          distances <- apply(microClustersCenters,1,function(centers){                    #Calcula a distancia do novo ponto para todos os microclusters
-                                                             dist(rbind(centers, newPoint[,1:NATTRIBUTES]))
-                                                    })
-          minDist <- min(distances)
-          minDistIndex <- which.min(distances)
-          
-          if(MICROCLUSTERS[[minDistIndex]]$n == 1){
-            if(MAXBOUNDARIES[minDistIndex] >= minDist){
-              print("adicionado no microcluster")
-              print(minDistIndex)
-              addPoint(as.numeric(minDistIndex),newPoint)
-            }
-          }else {
-             rmsd <- sqrt(sum(MICROCLUSTERS[[minDistIndex]]$CF2x)/MICROCLUSTERS[[minDistIndex]]$n - sum(MICROCLUSTERS[[minDistIndex]]$CF1x^2)/MICROCLUSTERS[[minDistIndex]]$n^2)
-             if(t*rmsd >= minDist){
-               addPoint(as.numeric(minDistIndex),newPoint)
-             }else{
-               #deleta ou junta microgrupos
-            
-                 
-             }
+          if(DATASTREAM$state$counter+POINTS_PER_UNIT_TIME >= DATASET_SIZE){
+            POINTS_PER_UNIT_TIME <- DATASET_SIZE - DATASTREAM$state$counter 
+            STOP_ITERATIONS = 1;
           }
-      }
-      #Verifica onde salvar snapshot
-      #verifica se faz a parte offline so seguir no indexPOint
+          
+                   #Recebe novos pontos
+          if(POINTS_PER_UNIT_TIME > 0){
+              newPoints <- get_points(DATASTREAM, n = POINTS_PER_UNIT_TIME, class = TRUE)
+              for(indexPoint in 1:POINTS_PER_UNIT_TIME){
+                  newPoint <- newPoints[indexPoint,1:NATTRIBUTES]
+                  class <- newPoints[indexPoint,NATTRIBUTES+1]
+                  microClustersCenters <- getCenters(MICROCLUSTERS)                               #Recupera os centros CF1x/n de todos os microclusters
+                  distances <- apply(microClustersCenters,1,function(centers){                    #Calcula a distancia do novo ponto para todos os microclusters
+                                                                     dist(rbind(centers, newPoint[,1:NATTRIBUTES]))
+                                                            })
+                  minDist <- min(distances)
+                  minDistIndex <- which.min(distances)
+                  
+                  if(MICROCLUSTERS[[minDistIndex]]$n == 1){
+                    if(MAXBOUNDARIES[minDistIndex] >= minDist){
+                      print("adicionado no microcluster")
+                      print(minDistIndex)
+                      addPoint(as.numeric(minDistIndex),newPoint)
+                    }
+                  }else {
+                     rmsd <- sqrt(sum(MICROCLUSTERS[[minDistIndex]]$CF2x)/MICROCLUSTERS[[minDistIndex]]$n - sum(MICROCLUSTERS[[minDistIndex]]$CF1x^2)/MICROCLUSTERS[[minDistIndex]]$n^2)
+                     if(t*rmsd >= minDist){
+                       addPoint(as.numeric(minDistIndex),newPoint)
+                     }else{
+                       meanTimeStamps <- sapply(MICROCLUSTERS,function(microcluster){calculateMeanTimeStamp(microcluster)})
+                       minRelevance <- min(meanTimeStamps)
+                       minRelevanceIndex <- which.min(meanTimeStamps)
+                       if(minRelevance[1]<phi){
+                         print("deletou")
+                         deleteMicroCluster(minRelevanceIndex[1],newPoint,class)
+                       }else{
+                         print("mergeu")
+                         DistCenters <- distBetweenMicroClusters(MICROCLUSTERS)
+                         minIndexes <- which(DistCenters == min(DistCenters[DistCenters!=min(DistCenters)]), arr.ind = TRUE)
+                         mcIndex1 <- minIndexes[1,1]
+                         mcIndex2 <- minIndexes[1,2]
+                         while(MICROCLUSTERS[[mcIndex1]]$class_id != MICROCLUSTERS[[mcIndex2]]$class_id){
+                           DistCenters[mcIndex2,mcIndex1]=Inf
+                           DistCenters[mcIndex1,mcIndex2]=Inf
+                           minIndexes <- which(DistCenters == min(DistCenters[DistCenters!=min(DistCenters)]), arr.ind = TRUE)
+                           mcIndex1 <- minIndexes[1,1]
+                           mcIndex2 <- minIndexes[1,2]
+                         }
+                         mergeMicroClusters(mcIndex1,mcIndex2)
+                         deleteMicroCluster(mcIndex2,newPoint,class)
+                       }
+                         
+                     }
+                  }
+              }
+          }
+        #salvar snapshot
+      }  
+     #KNN
 }
 
 

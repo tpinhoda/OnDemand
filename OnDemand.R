@@ -13,7 +13,12 @@ kfit <- h*0.1                #Quantidade de pontos que serão testadas
 m <- 10
 POINTS_PER_UNIT_TIME <- 2    #Pontos que chegarao a cada 1 unidade de tempo
 MAX_ITERATIONS <- 10
+
 phi <- 0.5
+frameNumber = round(log2(DATASET_SIZE))
+frameMaxCapacity <- 3
+frames = 0:(frameNumber-1)
+SNAPSHOTS = lapply(frames,function(frame){list(frameNumber=frame,frame=list())})
 #Primeiro Pegar do fluxo e depois splitar!
 
 #============================================FUNCÕES============================================================================
@@ -140,11 +145,14 @@ MAXBOUNDARIES <- t*apply(DistCenters,1,function(microClusterDists){
 
 #Fase 2 - Manutencão ONLINE
 
+iniTime <- 0
 time <- 0
 STOP_ITERATIONS <- 0
 while(!STOP_ITERATIONS){
-      for(time in 1:h-kfit){
-      
+  
+      iniTime <- time + 1
+      endTime <- iniTime + h - kfit
+      for(time in iniTime:endTime){
           if(DATASTREAM$state$counter+POINTS_PER_UNIT_TIME >= DATASET_SIZE){
             POINTS_PER_UNIT_TIME <- DATASET_SIZE - DATASTREAM$state$counter 
             STOP_ITERATIONS = 1;
@@ -165,8 +173,6 @@ while(!STOP_ITERATIONS){
                   
                   if(MICROCLUSTERS[[minDistIndex]]$n == 1){
                     if(MAXBOUNDARIES[minDistIndex] >= minDist){
-                      print("adicionado no microcluster")
-                      print(minDistIndex)
                       addPoint(as.numeric(minDistIndex),newPoint)
                     }
                   }else {
@@ -178,10 +184,10 @@ while(!STOP_ITERATIONS){
                        minRelevance <- min(meanTimeStamps)
                        minRelevanceIndex <- which.min(meanTimeStamps)
                        if(minRelevance[1]<phi){
-                         print("deletou")
+                    
                          deleteMicroCluster(minRelevanceIndex[1],newPoint,class)
                        }else{
-                         print("mergeu")
+                       
                          DistCenters <- distBetweenMicroClusters(MICROCLUSTERS)
                          minIndexes <- which(DistCenters == min(DistCenters[DistCenters!=min(DistCenters)]), arr.ind = TRUE)
                          mcIndex1 <- minIndexes[1,1]
@@ -202,8 +208,25 @@ while(!STOP_ITERATIONS){
               }
           }
         #salvar snapshot
+          for(fr in frames){
+            if(((time %% 2^fr) == 0) & (time %% 2^(fr+1)!=0)){
+              if(length(SNAPSHOTS[[fr+1]]$frame)<frameMaxCapacity){
+                print(length(SNAPSHOTS[[fr+1]]$frame))
+                SNAPSHOTS[[fr+1]]$frame <- c(SNAPSHOTS[[fr+1]]$frame,MICROCLUSTERS) 
+              }else{
+                #SNAPSHOTS[[fr+1]]$frame <- c(SNAPSHOTS[[fr+1]]$frame[2:frameMaxCapacity],MICROCLUSTERS)
+              }
+            }  
+          }
+        
       }  
      #KNN
+      if(DATASTREAM$state$counter+POINTS_PER_UNIT_TIME >= DATASET_SIZE){
+        POINTS_PER_UNIT_TIME <- DATASET_SIZE - DATASTREAM$state$counter 
+        STOP_ITERATIONS = 1;
+      }
+      newPoints <- get_points(DATASTREAM, n = POINTS_PER_UNIT_TIME, class = TRUE)
+      
 }
 
 

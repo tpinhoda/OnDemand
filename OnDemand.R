@@ -18,7 +18,7 @@ phi <- 0.5
 frameNumber = round(log2(DATASET_SIZE))
 frameMaxCapacity <- 3
 frames = 0:(frameNumber-1)
-SNAPSHOTS = lapply(frames,function(frame){list(frameNumber=frame,frame=list())})
+SNAPSHOTS = lapply(frames,function(frame){list(frameNumber=frame,frameslot=c())})
 #Primeiro Pegar do fluxo e depois splitar!
 
 #============================================FUNCÕES============================================================================
@@ -115,8 +115,8 @@ splittedPoints <- splitByClass(firstPoints)           #divide os pontos por clas
 
 #Pegar o grupo com menor quantidade de pontos para ser a quantidade de micro-grupos iniciais para cada classe
 classSetLength <-  lapply(splittedPoints, function(classSet) {nrow(classSet)})
-maxInitMicroClusters = as.numeric(classSetLength[which.min(classSetLength)])
-
+#maxInitMicroClusters = as.numeric(round(classSetLength[which.min(classSetLength)]/2))
+maxInitMicroClusters <- 3
 #Utilizar o kmeans em cada grupo de classe e retornar k microgrupos para cada classe
 set.seed(2)
 #Não consigo agrupar em k grupos onde k é o número de observacoes, WHY?!!
@@ -152,6 +152,7 @@ while(!STOP_ITERATIONS){
   
       iniTime <- time + 1
       endTime <- iniTime + h - kfit
+      oldSNAPSHOT <- SNAPSHOTS
       for(time in iniTime:endTime){
           if(DATASTREAM$state$counter+POINTS_PER_UNIT_TIME >= DATASET_SIZE){
             POINTS_PER_UNIT_TIME <- DATASET_SIZE - DATASTREAM$state$counter 
@@ -210,17 +211,20 @@ while(!STOP_ITERATIONS){
         #salvar snapshot
           for(fr in frames){
             if(((time %% 2^fr) == 0) & (time %% 2^(fr+1)!=0)){
-              if(length(SNAPSHOTS[[fr+1]]$frame)<frameMaxCapacity){
-                print(length(SNAPSHOTS[[fr+1]]$frame))
-                SNAPSHOTS[[fr+1]]$frame <- c(SNAPSHOTS[[fr+1]]$frame,MICROCLUSTERS) 
+              if(as.numeric(length(SNAPSHOTS[[fr+1]]$frameslot)) < frameMaxCapacity){
+                SNAPSHOTS[[fr+1]]$frameslot <- c(SNAPSHOTS[[fr+1]]$frameslot,list(MICROCLUSTERS)) 
+                print(length(SNAPSHOTS[[fr+1]]$frameslot))
               }else{
-                #SNAPSHOTS[[fr+1]]$frame <- c(SNAPSHOTS[[fr+1]]$frame[2:frameMaxCapacity],MICROCLUSTERS)
+                SNAPSHOTS[[fr+1]]$frameslot <- c(SNAPSHOTS[[fr+1]]$frameslot[2:frameMaxCapacity],list(MICROCLUSTERS)) 
               }
             }  
           }
         
       }  
      #KNN
+      
+      
+      
       if(DATASTREAM$state$counter+POINTS_PER_UNIT_TIME >= DATASET_SIZE){
         POINTS_PER_UNIT_TIME <- DATASET_SIZE - DATASTREAM$state$counter 
         STOP_ITERATIONS = 1;
@@ -233,3 +237,4 @@ while(!STOP_ITERATIONS){
 
 
 # MICROCLUSTERS[[1]]$CF1x para acessar membros da lista 
+#a <- SNAPSHOTS[[1]]$frameslot[[1]][[1]].CF1x

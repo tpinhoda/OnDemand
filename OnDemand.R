@@ -9,7 +9,7 @@ MAX_NUMBER_MC <- 12          #verificar um jeito mais generico (algo mais autom�
 MC_ID <- 0                   #contador de id do microgrupo
 t <- 2                       #multiplica pela distancia do micro-grupo mais proximo para definir o limite maximo do micro-grupo inicial
 h <- 10                      #Tamanho da janela de tempo que será processada
-kfit <- h*0.1                #Quantidade de pontos que serão testadas
+kfit <- h*0.3                #Quantidade de pontos que serão testadas
 m <- 10
 POINTS_PER_UNIT_TIME <- 2    #Pontos que chegarao a cada 1 unidade de tempo
 MAX_ITERATIONS <- 10
@@ -141,6 +141,7 @@ findRelatingMics <- function(mc1,mc2) {
   return(mc1)
 }
 
+eucDist <- function(x1, x2){ return(sqrt(sum((x1 - x2) ^ 2))) }
 #========================================INÍCIO=======================================================================
 #Fase 1 - Inicializacão - OFFLINE
 
@@ -158,7 +159,7 @@ splittedPoints <- splitByClass(firstPoints)           #divide os pontos por clas
 #Pegar o grupo com menor quantidade de pontos para ser a quantidade de micro-grupos iniciais para cada classe
 classSetLength <-  lapply(splittedPoints, function(classSet) {nrow(classSet)})
 #maxInitMicroClusters = as.numeric(round(classSetLength[which.min(classSetLength)]/2))
-maxInitMicroClusters <- 3
+maxInitMicroClusters <- 4
 #Utilizar o kmeans em cada grupo de classe e retornar k microgrupos para cada classe
 set.seed(2)
 #Não consigo agrupar em k grupos onde k é o número de observacoes, WHY?!!
@@ -210,14 +211,25 @@ while(!STOP_ITERATIONS){
                   distances <- apply(microClustersCenters,1,function(centers){                    #Calcula a distancia do novo ponto para todos os microclusters
                                                                      dist(rbind(centers, newPoint[,1:NATTRIBUTES]))
                                                             })
-                  minDist <- min(distances)
-                  minDistIndex <- which.min(distances)
-                  
+                  founded <- 0
+                  checked <- 0
+                  while((founded == 0) && (checked < length(distances))){                    
+                      minDist <- min(distances)
+                      minDistIndex <- which.min(distances)
+                      if(class == MICROCLUSTERS[[minDistIndex]]$class_id){
+                        founded <- 1
+                        checked <- 0
+                      }else{
+                      distances[minDistIndex] = Inf
+                      checked <- checked + 1
+                      }
+                  }
                   if(MICROCLUSTERS[[minDistIndex]]$n == 1){
                     if(MAXBOUNDARIES[minDistIndex] >= minDist){
                       addPoint(as.numeric(minDistIndex),newPoint)
                     }
                   }else {
+                    if(checked < length(distances)){
                      rmsd <- sqrt(sum(MICROCLUSTERS[[minDistIndex]]$CF2x)/MICROCLUSTERS[[minDistIndex]]$n - sum(MICROCLUSTERS[[minDistIndex]]$CF1x^2)/MICROCLUSTERS[[minDistIndex]]$n^2)
                      if(t*rmsd >= minDist){
                        addPoint(as.numeric(minDistIndex),newPoint)
@@ -246,7 +258,32 @@ while(!STOP_ITERATIONS){
                        }
                          
                      }
-                  }
+                    }else{
+                      meanTimeStamps <- sapply(MICROCLUSTERS,function(microcluster){calculateMeanTimeStamp(microcluster)})
+                      minRelevance <- min(meanTimeStamps)
+                      minRelevanceIndex <- which.min(meanTimeStamps)
+                      if(minRelevance[1]<phi){
+                        
+                        deleteMicroCluster(minRelevanceIndex[1],newPoint,class)
+                      }else{
+                        
+                        DistCenters <- distBetweenMicroClusters(MICROCLUSTERS)
+                        minIndexes <- which(DistCenters == min(DistCenters[DistCenters!=min(DistCenters)]), arr.ind = TRUE)
+                        mcIndex1 <- minIndexes[1,1]
+                        mcIndex2 <- minIndexes[1,2]
+                        while(MICROCLUSTERS[[mcIndex1]]$class_id != MICROCLUSTERS[[mcIndex2]]$class_id){
+                          DistCenters[mcIndex2,mcIndex1]=Inf
+                          DistCenters[mcIndex1,mcIndex2]=Inf
+                          minIndexes <- which(DistCenters == min(DistCenters[DistCenters!=min(DistCenters)]), arr.ind = TRUE)
+                          mcIndex1 <- minIndexes[1,1]
+                          mcIndex2 <- minIndexes[1,2]
+                        }
+                        mergeMicroClusters(mcIndex1,mcIndex2)
+                        deleteMicroCluster(mcIndex2,newPoint,class)
+                      }
+                      
+                    }
+                  }  
               }
           }
         #salvar snapshot
@@ -254,7 +291,6 @@ while(!STOP_ITERATIONS){
             if(((time %% 2^fr) == 0) & (time %% 2^(fr+1)!=0)){
               if(as.numeric(length(SNAPSHOTS[[fr+1]]$frameslot)) < frameMaxCapacity){
                 SNAPSHOTS[[fr+1]]$frameslot <- c(SNAPSHOTS[[fr+1]]$frameslot,list(list(MICROCLUSTERS = MICROCLUSTERS, time = time))) 
-                print(length(SNAPSHOTS[[fr+1]]$frameslot))
               }else{
                 SNAPSHOTS[[fr+1]]$frameslot <- c(SNAPSHOTS[[fr+1]]$frameslot[2:frameMaxCapacity],list(list(MICROCLUSTERS = MICROCLUSTERS, time = time))) 
               }
@@ -274,12 +310,41 @@ while(!STOP_ITERATIONS){
         if(sum(as.numeric(centersFitting[c,1:NATTRIBUTES])>0))
           knnCenters <- rbind(knnCenters, centersFitting[c,])
       }
+      if(nrow(knnCenters) > 1){
+        centers <- apply(knnCenters[,1:NATTRIBUTES],2,as.numeric)
+      }else
+        centers <- as.numeric(knnCenters[1:NATTRIBUTES])
       
-      if(DATASTREAM$state$counter+POINTS_PER_UNIT_TIME >= DATASET_SIZE){
+      centersClass <- knnCenters[,NATTRIBUTES+1]
+        
+      POINTS_TO_FITTING <- POINTS_PER_UNIT_TIME * kfit
+      if(DATASTREAM$state$counter+POINTS_PER_UNIT_TIME*kfit >= DATASET_SIZE){
         POINTS_PER_UNIT_TIME <- DATASET_SIZE - DATASTREAM$state$counter 
         STOP_ITERATIONS = 1;
       }
-      newPoints <- get_points(DATASTREAM, n = POINTS_PER_UNIT_TIME, class = TRUE)
+        
+      if(POINTS_TO_FITTING > 0){
+        time <- time + kfit
+        fittingPoints <- get_points(DATASTREAM, n = POINTS_TO_FITTING, class = TRUE)
+        fittingP <- (data.matrix(fittingPoints[,1:NATTRIBUTES]))
+        fittingPClass <- as.character(fittingPoints[,NATTRIBUTES+1])
+        
+        fitting <- c()
+        for(p in 1:POINTS_TO_FITTING){
+          
+          distFitting <- apply(centers,1,function(center){eucDist(fittingP[p,],center)}) 
+          indexMinFitting <- which.min(distFitting)
+          fitting[p] <- centersClass[indexMinFitting] 
+        } 
+        print("RESULTS +++++++++++++++++++++++++++++++++++=")
+        print(fitting)
+        print(fittingPClass)
+      
+      }
+        #    newPoints[,NATTRIBUTES+1] = as.character(newPoints[,NATTRIBUTES+1])
+      
+  #    pointsAndCenters <- rbind(knnCenters,newPoints)
+      
       
 }
 

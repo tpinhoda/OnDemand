@@ -23,9 +23,9 @@ P <- 1                       #Quantidade de horizontes para a classificacão
 STORE_MC <- 1                #Intervalo de tempo para armazenar um snapshot
 
 #-------------------------------------------Variáveis globais inicializadas automaticamente-------------------------------------------------------------------
-FRAME_NUMBER = round(log2(DATASET_SIZE))      #Quantidade de frames que haverá na tabela geométrica
-FRAMES = 0:(frameNumber-1)                    #Lista dos números dos frames ordenada de forma crescente (0 - framenumber-1)
-SNAPSHOTS = lapply(frames,function(frame){list(frameNumber=frame,frameslot=c())}) #Estrutura da tabela geométrica
+FRAME_NUMBER = round(log2(TRAINING_SET_SIZE))      #Quantidade de frames que haverá na tabela geométrica
+FRAMES = 0:(FRAME_NUMBER-1)                    #Lista dos números dos frames ordenada de forma crescente (0 - framenumber-1)
+SNAPSHOTS = lapply(FRAMES,function(frame){list(frame_number=frame,frame_slot=c())}) #Estrutura da tabela geométrica
 MC_ID <- 0                                    #Contador de id dos micro-grupos
 TIME <- 0                                     #Contador de tempo
 
@@ -59,6 +59,7 @@ MICROCLUSTERS <- sapply(splitted_microclusters, function(class_set_mc){
                              create.microcluster(center,class_set_mc$class)
                         })                           
                   })
+MICROCLUSTERS_SIZE = length(MICROCLUSTERS)
 
 #Calculo do limite de acão maximo de cada micro-grupo inicial
 
@@ -80,16 +81,30 @@ while(remaining_points > 0){
     BUFFER_SIZE < remaining_points
   }
   
-  #Pega os BUFFER_SIZE pontos do fluxo de treino
-  training_points <- get_centers(TRAINING_STREAM, n=BUFFER_SIZE, class = TRUE)
-  #Pega os BUFFER_SIZE+displacement pontos do fluxo de treino para deixa-los no mesmo tempo
+  remaining_points_buffer <- BUFFER_SIZE
+  points_until_store <- STORE_MC*POINTS_PER_UNIT_TIME
+  #Processa BUFFER_SIZE pontos do fluxo de treino por STORE_MC*POINTS_PER_UNIT
+  while(remaining_points_buffer > 0){
+    
+    training_points <- get_centers(TRAINING_STREAM, n=points_until_store, class = TRUE)
+    for(stream_point in training_points){
+      class_stream_point <- as.character(stream_point[NATTRIBUTES+1]) #Classe do ponto
+      stream_point <- stream_point[1:NATTRIBUTES]                     #Ponto sem a classe
+      
+      #Calcular distancia do ponto para os microgrupos de sua classe
+      
+    }
+    
+    #salvar snapshot
+    remaining_points_buffer <- remaining_points_buffer - points_until_store 
+  }
+  
+  
+  
+  
+  
   test_points <- get_centers(TEST_STREAM, n=BUFFER_SIZE+displacement,class = TRUE)
-  
-  
-  
-  
-  
-  
+  #Pega os BUFFER_SIZE+displacement pontos do fluxo de treino para deixa-los no mesmo tempo
   displacement <- KFIT
 }
 

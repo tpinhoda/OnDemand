@@ -20,8 +20,6 @@ create.microcluster <- function(center,class){
   return(list(CF1x=center,CF2x=center^2,CF1t=0,CF2t=0,n=1,class_id=class,id=MC_ID))
 }
 
-
-
 get.centers <- function(MICROCLUSTERS){
   #Retorna o centro de todos os micro-grupos
   return(t(sapply(MICROCLUSTERS, function(microcluster){
@@ -43,6 +41,29 @@ dist.microclusters <- function(MICROCLUSTERS){
   colnames(dist_centers) <- c(1:length(MICROCLUSTERS))
   
   return(dist_centers)
+}
+
+find.microclusters <-function(MICROCLUSTERS,class){
+  #retorna a lista de ids de micro-grupos da mesma classe
+  ids_class <- c()
+  for(microcluster_index in 1:MICROCLUSTERS_SIZE)
+    if(MICROCLUSTERS[[microcluster_index]]$class_id == class)
+       ids_class <- c(ids_class,microcluster_index)
+  return(ids_class)  
+}
+
+get.distances <- function(MICROCLUSTERS,point){
+  microclusters_centers <- get.centers(MICROCLUSTERS)              #Recupera os centros CF1x/n de todos os microclusters
+  distances <- apply(microclusters_centers,1,function(centers){    #Calcula a distancia do novo ponto para todos os microclusters
+                    dist(rbind(centers, point))
+                })
+  return(distances)
+}
+
+nearest.microcluster <- function(MICROCLUSTERS,point,class){
+  class_microclusters <- find.microclusters(MICROCLUSTERS,class)
+  point_distances <- get.distances(MICROCLUSTERS,point)
+  for()
 }
 
 getCentersAndClass <- function(MICROCLUSTERS){

@@ -1,10 +1,11 @@
 library(stream)
 #----------------------------------------------------------------
-DATASET = iris               #Mudar isso para ser mais genérico
+#DATASET = iris               #Mudar isso para ser mais genérico
+DATASET = read.csv("~/Data\ Stream/DS_Datasets/Synthetic/Stationary/BG_10k/BarsGaussAN0_10000.csv")
 NCOLLUMS <- ncol(DATASET)    #Retorna númedo de colunas do dataset
 DATASET_SIZE <-nrow(DATASET)
 NATTRIBUTES <- NCOLLUMS -1   #Calcula quantidade de atributos
-INITNUMBER <- 15             #mudar isso para ser mais genérico(algo mais automático)  
+INITNUMBER <- 500            #mudar isso para ser mais genérico(algo mais automático)  
 MAX_NUMBER_MC <- 12          #verificar um jeito mais generico (algo mais automático)  TEM QUE POR NO KMEANS
 MC_ID <- 0                   #contador de id do microgrupo
 t <- 2                       #multiplica pela distancia do micro-grupo mais proximo para definir o limite maximo do micro-grupo inicial
@@ -159,7 +160,7 @@ splittedPoints <- splitByClass(firstPoints)           #divide os pontos por clas
 #Pegar o grupo com menor quantidade de pontos para ser a quantidade de micro-grupos iniciais para cada classe
 classSetLength <-  lapply(splittedPoints, function(classSet) {nrow(classSet)})
 #maxInitMicroClusters = as.numeric(round(classSetLength[which.min(classSetLength)]/2))
-maxInitMicroClusters <- 4
+maxInitMicroClusters <- 9
 #Utilizar o kmeans em cada grupo de classe e retornar k microgrupos para cada classe
 set.seed(2)
 #Não consigo agrupar em k grupos onde k é o número de observacoes, WHY?!!
@@ -319,7 +320,7 @@ while(!STOP_ITERATIONS){
         
       POINTS_TO_FITTING <- POINTS_PER_UNIT_TIME * kfit
       if(DATASTREAM$state$counter+POINTS_PER_UNIT_TIME*kfit >= DATASET_SIZE){
-        POINTS_PER_UNIT_TIME <- DATASET_SIZE - DATASTREAM$state$counter 
+        POINTS_TO_FITTING <- DATASET_SIZE - DATASTREAM$state$counter 
         STOP_ITERATIONS = 1;
       }
         
@@ -337,9 +338,15 @@ while(!STOP_ITERATIONS){
           fitting[p] <- centersClass[indexMinFitting] 
         } 
         print("RESULTS +++++++++++++++++++++++++++++++++++=")
-        print(fitting)
-        print(fittingPClass)
-      
+        
+        acc = 0
+        for(p in 1:length(fittingPClass)){
+          if (fitting[p] == fittingPClass[p]){
+            acc <- acc +1
+          }
+        }
+        acc <- acc/POINTS_TO_FITTING
+        print(acc)
       }
         #    newPoints[,NATTRIBUTES+1] = as.character(newPoints[,NATTRIBUTES+1])
       

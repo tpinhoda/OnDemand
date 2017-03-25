@@ -1,21 +1,48 @@
 #============================================FUNCÕES============================================================================
-splitByClass <- function(dataset){
-  classList <-dataset[,ncol(dataset)]
-  splittedDF <- split(dataset,classList)
-  return(splittedDF)
-}
-
-createDataStream <- function(dataset){
+create.datastream <- function(dataset){
   #Transformar um data set em um fluxo
-  stream <- DSD_Memory(dataset[,c(1:NATTRIBUTES)], class=dataset[,NATTRIBUTES+1], loop = FALSE) #Cria o fluxo a partir do dataset escolhido 
-  return(stream)
+  #Cria o fluxo a partir do dataset escolhido
   #Caso queira um fluxo infinito mude o atributo loop para TRUE
+  stream <- DSD_Memory(dataset[,c(1:NATTRIBUTES)], class=dataset[,NATTRIBUTES+1], loop = FALSE)  
+  return(stream)
 }
 
-getCenters <- function(MICROCLUSTERS){
+split.class <- function(dataset){
+  #Cria uma lista de pontos separados pela classe
+  class_list <-dataset[,NATTRIBUTES+1]
+  splitted <- split(dataset,class_list)
+  return(splitted)
+}
+
+create.microcluster <- function(center,class){
+  #Cria um novo micro-grupo
+  MC_ID <<- MC_ID + 1
+  return(list(CF1x=center,CF2x=center^2,CF1t=0,CF2t=0,n=1,class_id=class,id=MC_ID))
+}
+
+
+
+get.centers <- function(MICROCLUSTERS){
+  #Retorna o centro de todos os micro-grupos
   return(t(sapply(MICROCLUSTERS, function(microcluster){
     microcluster$CF1x/microcluster$n
   })))
+}
+
+dist.microclusters <- function(MICROCLUSTERS){
+  #Retorna uma matrix de distancia entro todosos micro-grupos
+  
+  micro_clusters_centers <- get.centers(MICROCLUSTERS)
+  
+  #Calcula a distancia entre os micro-grupos
+  dist_centers <- dist(micro_clusters_centers)
+  dist_centers <- as.matrix(dist_centers)
+  
+  #renomeia as linhas e colunas
+  rownames(dist_centers) <- c(1:length(MICROCLUSTERS))
+  colnames(dist_centers) <- c(1:length(MICROCLUSTERS))
+  
+  return(dist_centers)
 }
 
 getCentersAndClass <- function(MICROCLUSTERS){
@@ -34,23 +61,6 @@ addPoint <- function(microClusterIndex,point){
   
 }
 
-createMicroCluster <- function(center,class){
-  MC_ID <<- MC_ID + 1
-  return(list(CF1x=center,CF2x=center^2,CF1t=0,CF2t=0,n=1,class_id=class,id=MC_ID))
-}
-
-distBetweenMicroClusters <- function(MICROCLUSTERS){
-  microClustersCenters <- getCenters(MICROCLUSTERS)
-  
-  #Calcula a distancia entre os micro-grupos
-  DistCenters <- dist(microClustersCenters)
-  DistCenters <- as.matrix(DistCenters)
-  
-  rownames(DistCenters) <- c(1:length(MICROCLUSTERS))
-  colnames(DistCenters) <- c(1:length(MICROCLUSTERS))
-  
-  return(DistCenters)
-}
 
 calculateMeanTimeStamp <- function(microcluster){
   meanTimeStamp <- microcluster$CF1t/microcluster$n

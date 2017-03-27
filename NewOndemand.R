@@ -73,25 +73,41 @@ mc_initial_max_boundary <- T*apply(dist_centers_matrix,1,function(dists_microclu
 
 #Fase 2 - Manutencão ONLINE
 remaining_points = TRAINING_SET_SIZE - INITNUMBER #pontos restantes no fluxo de treino a serem processados
-displacement = INITNUMBER
-while(remaining_points > 0){
-  
-  #Verifica se a quantidade de pontos restantes é menor do que a quantidade de pontos para o buffer
-  if(remaining_points < BUFFER_SIZE){
-    BUFFER_SIZE < remaining_points
-  }
+displacement = INITNUMBER + KFIT
+while(remaining_points >= BUFFER_SIZE+KFIT){
   
   remaining_points_buffer <- BUFFER_SIZE
   points_until_store <- STORE_MC*POINTS_PER_UNIT_TIME
   #Processa BUFFER_SIZE pontos do fluxo de treino por STORE_MC*POINTS_PER_UNIT
   while(remaining_points_buffer > 0){
     
-    training_points <- get_centers(TRAINING_STREAM, n=points_until_store, class = TRUE)
+    training_points <- get_points(TRAINING_STREAM, n=points_until_store, class = TRUE)
     for(stream_point in training_points){
       class_stream_point <- as.character(stream_point[NATTRIBUTES+1]) #Classe do ponto
       stream_point <- stream_point[1:NATTRIBUTES]                     #Ponto sem a classe
       
       #Calcular distancia do ponto para os microgrupos de sua classe
+      nearest <- nearest.microcluster(MICROCLUSTERS,stream_point,class_stream_point)
+      
+      min_relevant <- find.min.relevant(MICROCLUSTERS)
+      if(nearest == "no.class"){
+        if(min_relevant$relevance < PHI)
+          deleteMicroCluster()
+        else
+          mergeMicroClusters()
+      }else{
+        microcluster_maxboundary <- get.mic.maxboundary(MICROCLUSTERS,min_relevant$index)
+        if(nearest$distance <= microcluster_maxboundary )
+          addPoint()
+        else{
+          if(min_relevant$relevance < PHI)
+            deleteMicroCluster()
+          else
+            mergeMicroClusters()
+        }
+      }
+        
+      #Verifica se o ponto esta no raio de cobertura do micro-grupo
       
     }
     
@@ -102,10 +118,11 @@ while(remaining_points > 0){
   
   
   
-  
-  test_points <- get_centers(TEST_STREAM, n=BUFFER_SIZE+displacement,class = TRUE)
+  kfit_points <- get_points(TRAINING_STREAM, n=KFIT, class = TRUE)
+  test_points <- get_points(TEST_STREAM, n=BUFFER_SIZE+displacement,class = TRUE)
   #Pega os BUFFER_SIZE+displacement pontos do fluxo de treino para deixa-los no mesmo tempo
   displacement <- KFIT
+  remaining_points <- remaining_points - (BUFFER_SIZE + KFIT)
 }
 
 

@@ -59,12 +59,40 @@ get.distances <- function(MICROCLUSTERS,point){
                 })
   return(distances)
 }
+is.empty <- function(x) return(length(x) == 0)
 
 nearest.microcluster <- function(MICROCLUSTERS,point,class){
   class_microclusters <- find.microclusters(MICROCLUSTERS,class)
+  if(is.empty(class_microclusters))
+    return("no.class")
+  
   point_distances <- get.distances(MICROCLUSTERS,point)
-  for()
+  nearest_index <- class_microclusters[which.min(point_distances[class_microclusters])]
+  nearest_dist <- which.min(point_distances[class_microclusters])
+  return(c(index = nearest_index, distance = nearest_dist))
 }
+
+
+mean.timestamp <- function(microcluster){
+  points_number <- microcluster$n
+  mean_timestamp <- microcluster$CF1t/points_number
+  std_timestamp <- sqrt((microcluster$CF2t/microcluster$n)-(microcluster$CF1t/points_number)^2)
+  
+  if(microcluster$n < 2*M*points_number)
+    return(mean_timestamp)
+  else{
+    
+    return(qnorm(((M*points_number)/(2*points_number)),mean_timestamp,std_timestamp))
+  }  
+}
+
+find.min.relevant <- function(MICROCLUSTERS){
+  mean_timestamps <- sapply(MICROCLUSTERS,function(microcluster){mean.timestamp(microcluster)})
+  min_relevance <- min(mean_timestamps)
+  min_relevant_index <- which.min(mean_timestamps)
+  return(c(index = min_relevant_index, relevance = min_relevance))
+}
+
 
 getCentersAndClass <- function(MICROCLUSTERS){
   return(t(sapply(MICROCLUSTERS, function(microcluster){

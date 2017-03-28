@@ -10,15 +10,15 @@ NATTRIBUTES <- ncol(TRAINING_DATASET) -1      #Calcula quantidade de atributos p
 
 #----------------------------------------------Variáveis de inicializacao do algoritmo-----------------------------------------------------------------------------------------
 INITNUMBER <- 200            #Quantidade inicial de pontos que serão utilizados na criacao dos micro-grupos iniciais  
-MICROCLUSTER_RATIO <- 5     #Quantidade de micro-grupos máxima por classe na criacao inicial
-FRAME_MAX_CAPACITY <- 7      #Quantidade de snapshost por frame
-BUFFER_SIZE <- 1000           #Quantidade de pontos a ser recebida até para q seja feito o teste no fluxo de teste
-KFIT <- 100                   #Quantidade de pontos que serão testadas
+MICROCLUSTER_RATIO <- 2      #Quantidade de micro-grupos máxima por classe na criacao inicial
+FRAME_MAX_CAPACITY <- 8      #Quantidade de snapshost por frame
+BUFFER_SIZE <- 500          #Quantidade de pontos a ser recebida até para q seja feito o teste no fluxo de teste
+KFIT <- 100                  #Quantidade de pontos que serão testadas
 T <- 2                       #Multiplica pela distancia do micro-grupo mais proximo para definir o limite maximo do micro-grupo inicial
 M <- 0.32                    #Porcentagem de ultimos pontos a chegar no micro-grupo
 POINTS_PER_UNIT_TIME <- 50   #Pontos que chegarao a cada 1 unidade de tempo
 MAX_ITERATIONS <- 10         #Quantidade max de iteracoes do algoritmo
-PHI <- 0.5                   #Limiar para decidir se um mcrogrupo é deletado ou merge
+PHI <- 25*1000                #Limiar para decidir se um mcrogrupo é deletado ou merge
 P <- 1                       #Quantidade de horizontes para a classificacão
 STORE_MC <- 1                #Intervalo de tempo para armazenar um snapshot
 
@@ -27,7 +27,8 @@ FRAME_NUMBER = round(log2(TRAINING_SET_SIZE))      #Quantidade de frames que hav
 FRAMES = 0:(FRAME_NUMBER-1)                    #Lista dos números dos frames ordenada de forma crescente (0 - framenumber-1)
 SNAPSHOTS = lapply(FRAMES,function(frame){list(frame_number=frame,frame_slot=c())}) #Estrutura da tabela geométrica
 MC_ID <- 0                                    #Contador de id dos micro-grupos
-TIME <- 0                                     #Contador de tempo
+TIME <- 0                                     #Contador de tempo em unit * 1000
+HORIZONS <- 2^(1:FRAME_MAX_CAPACITY)*1000              #Horizontes para verificar os kfit pontos
 
 #------------------------------------------------------Inicializa funcões--------------------------------------------------------------------------------------------
 source("Utils.R")
@@ -45,7 +46,7 @@ inicialization_points <- get_points(TRAINING_STREAM, n = INITNUMBER, class = TRU
 splitted_points <- split.class(inicialization_points)                              #Separa os pontos por classe
 
 #Atualiza o tempo do sistema
-TIME <- INITNUMBER/POINTS_PER_UNIT_TIME
+TIME <- (INITNUMBER/POINTS_PER_UNIT_TIME)*1000
 
 #Utilizar o kmeans em cada grupo de classe e retornar k microgrupos para cada classe
 set.seed(1)
@@ -74,58 +75,67 @@ mc_initial_max_boundary <- T*apply(dist_centers_matrix,1,function(dists_microclu
 #Fase 2 - Manutencão ONLINE
 remaining_points = TRAINING_SET_SIZE - INITNUMBER #pontos restantes no fluxo de treino a serem processados
 displacement = INITNUMBER + KFIT
+it <- 0
 while(remaining_points >= BUFFER_SIZE+KFIT){
-  
+  it <- it + 1
+  print(it)
   remaining_points_buffer <- BUFFER_SIZE
   points_until_store <- STORE_MC*POINTS_PER_UNIT_TIME
   #Processa BUFFER_SIZE pontos do fluxo de treino por STORE_MC*POINTS_PER_UNIT
   while(remaining_points_buffer > 0){
     
     training_points <- get_points(TRAINING_STREAM, n=points_until_store, class = TRUE)
-    for(stream_point in training_points){
+    
+    #Atualizacao dos micro-gupos
+    for(stream_point in get.rows(training_points)){
+     
       class_stream_point <- as.character(stream_point[NATTRIBUTES+1]) #Classe do ponto
-      stream_point <- stream_point[1:NATTRIBUTES]                     #Ponto sem a classe
-      
+      stream_point <- t(stream_point[1:NATTRIBUTES])                     #Ponto sem a classe
+  
       #Calcular distancia do ponto para os microgrupos de sua classe
       nearest <- nearest.microcluster(MICROCLUSTERS,stream_point,class_stream_point)
       
       min_relevant <- find.min.relevant(MICROCLUSTERS)
-      if(nearest == "no.class"){
-        if(min_relevant$relevance < PHI)
-          deleteMicroCluster()
+      if(is.empty(nearest))
+        check.relevance(min_relevant,stream_point,class_stream_point)
+      else{
+        microcluster_maxboundary <- get.maxboundary(MICROCLUSTERS,nearest['index'])
+        if(nearest['distance'] <= microcluster_maxboundary )
+          add.point(nearest['index'],stream_point)
         else
-          mergeMicroClusters()
-      }else{
-        microcluster_maxboundary <- get.mic.maxboundary(MICROCLUSTERS,min_relevant$index)
-        if(nearest$distance <= microcluster_maxboundary )
-          addPoint()
-        else{
-          if(min_relevant$relevance < PHI)
-            deleteMicroCluster()
-          else
-            mergeMicroClusters()
-        }
+          check.relevance(min_relevant,stream_point,class_stream_point)
       }
-        
-      #Verifica se o ponto esta no raio de cobertura do micro-grupo
-      
     }
     
     #salvar snapshot
-    remaining_points_buffer <- remaining_points_buffer - points_until_store 
+    TIME <- TIME + (STORE_MC*1000)
+    remaining_points_buffer <- remaining_points_buffer - points_until_store
+    store.snapshot(MICROCLUSTERS,TIME)
+  }
+  
+  #Fitting dos kfit pontos do fluxo de treino
+  kfit_points <- get_points(TRAINING_STREAM, n=KFIT, class = TRUE)
+  knn_testset <- kfit_points[,-(NATTRIBUTES+1)]
+  knn_labelstest <- kfit_points[,(NATTRIBUTES+1)]
+  HORIZONS_FITTING <- c()
+  for(h in HORIZONS){
+    horizon_microluster <- relating.microcluster(TIME,h)
+    knn_trainingset <-as.data.frame(get.centers(horizon_microluster))
+    classes <- as.factor(t(get.class(horizon_microluster)))
+    y_pred <- knn(knn_trainingset,knn_testset,classes,k=1)
+    accuracy_kfit <- calculate.accuracy(y_pred,knn_labelstest)
+    HORIZONS_FITTING <- c(HORIZONS_FITTING,list(list(model = knn_trainingset, accuracy = accuracy_kfit, n=horizon_microluster[[1]]$n)))
   }
   
   
-  
-  
-  kfit_points <- get_points(TRAINING_STREAM, n=KFIT, class = TRUE)
   test_points <- get_points(TEST_STREAM, n=BUFFER_SIZE+displacement,class = TRUE)
   #Pega os BUFFER_SIZE+displacement pontos do fluxo de treino para deixa-los no mesmo tempo
   displacement <- KFIT
   remaining_points <- remaining_points - (BUFFER_SIZE + KFIT)
 }
 
-
+for(i in 1:20)
+  print(MICROCLUSTERS[[i]]$id)
 iniTime <- 0
 time <- 0
 STOP_ITERATIONS <- 0
@@ -287,11 +297,6 @@ while(!STOP_ITERATIONS){
 }
 
 
- mod<-function(x,m)
-     {
-         t1<-x/m
-         return(x-t1*m)
-       }
 
 
 # MICROCLUSTERS[[1]]$CF1x para acessar membros da lista 

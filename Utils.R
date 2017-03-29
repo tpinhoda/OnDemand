@@ -23,7 +23,6 @@ create.microcluster <- function(center,class){
 get.centers <- function(MICROCLUSTERS){
   #Retorna o centro de todos os micro-grupos
   return(t(sapply(MICROCLUSTERS, function(microcluster){
-    if(microcluster$n >0)
       microcluster$CF1x/microcluster$n
   })))
 }
@@ -31,7 +30,6 @@ get.centers <- function(MICROCLUSTERS){
 get.class <- function(MICROCLUSTERS){
   #Retorna o centro de todos os micro-grupos
   return(t(sapply(MICROCLUSTERS, function(microcluster){
-    if(microcluster$n >0)
       microcluster$class_id
   })))
 }
@@ -121,6 +119,14 @@ delete.microcluster <- function(microcluster_index,point,class){
   MICROCLUSTERS[[microcluster_index]]$class_id <<- class
   MC_ID <<- MC_ID + 1
   MICROCLUSTERS[[microcluster_index]]$id <<- MC_ID
+  
+  #Calculo do limite de acão maximo de cada micro-grupo inicial
+  
+  dist_centers_matrix <- dist.microclusters(MICROCLUSTERS) #calcula a distancia entre todos os micro-grupos inciais
+  
+  mc_initial_max_boundary <<- T*apply(dist_centers_matrix,1,function(dists_microcluster){
+    c(min( dists_microcluster[dists_microcluster!=min(dists_microcluster)] ))    
+  }) 
 }
 
 
@@ -218,13 +224,14 @@ relating.microcluster <- function(time,horizon) {
   while(idmc1 < length(mc1)){
     idmc2 <- 1
     while(idmc2 < length(mc2)){
-      if(length(setdiff(mc1[[idmc1]]$id,mc2[[idmc2]]$id))<length(mc1[[idmc1]]$id))
+      if(length(setdiff(mc1[[idmc1]]$id,mc2[[idmc2]]$id))<length(mc1[[idmc1]]$id)){
         mc1[[idmc1]]$CF1x <- mc1[[idmc1]]$CF1x - mc2[[idmc2]]$CF1x
-      mc1[[idmc1]]$CF2x <- mc1[[idmc1]]$CF2x - mc2[[idmc2]]$CF2x
-      mc1[[idmc1]]$CF1t <- mc1[[idmc1]]$CF1t - mc2[[idmc2]]$CF1t
-      mc1[[idmc1]]$CF2t <- mc1[[idmc1]]$CF2t - mc2[[idmc2]]$CF2t
-      mc1[[idmc1]]$n <- mc1[[idmc1]]$n - mc2[[idmc2]]$n
-      mc1[[idmc1]]$CF1t <- setdiff(mc1[[idmc1]]$id,mc2[[idmc2]]$id)
+        mc1[[idmc1]]$CF2x <- mc1[[idmc1]]$CF2x - mc2[[idmc2]]$CF2x
+        mc1[[idmc1]]$CF1t <- mc1[[idmc1]]$CF1t - mc2[[idmc2]]$CF1t
+        mc1[[idmc1]]$CF2t <- mc1[[idmc1]]$CF2t - mc2[[idmc2]]$CF2t
+        mc1[[idmc1]]$n <- mc1[[idmc1]]$n - mc2[[idmc2]]$n
+        mc1[[idmc1]]$CF1t <- setdiff(mc1[[idmc1]]$id,mc2[[idmc2]]$id)
+      }  
       idmc2 <- idmc2 + 1
     }
     idmc1 <- idmc1 + 1
@@ -243,4 +250,14 @@ calculate.accuracy <- function(y_pred,label){
     index_label <- index_label + 1
   }
   return(right/index_label)
+}
+
+get.besthorizons <- function(HORIZONS_FITTING,P){
+  accuracy <- sapply(HORIZONS_FITTING,function(horizon){horizon$accuracy})
+  best_accuracy <- order(accuracy,decreasing = T)[1:P]
+  best_horizons <- c()
+  for(index in best_accuracy){
+    best_horizons <- c(best_horizons,list(HORIZONS_FITTING[[index]]))
+  }
+  return(best_horizons)
 }

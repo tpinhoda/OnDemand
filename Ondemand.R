@@ -3,26 +3,33 @@
   library(ggplot2)
   #------------------------------------------------------Variáveis do Dataset--------------------------------------------------------------------------------------
   #Separa o Conjunto de teste e o de treino 1 por 1
-  TRAINING_DATASET = read.csv("../../DS_Datasets/Synthetic/Non-Stationary/Bench2_10k/Benchmark2_10000.csv")[c(TRUE, FALSE), ]
-  TEST_DATASET = read.csv("../../DS_Datasets/Synthetic/Non-Stationary/Bench2_10k/Benchmark2_10000.csv")[c(FALSE, TRUE), ]
+  TRAINING_DATASET = read.csv("~/Data\ Stream/DS_Datasets/Synthetic/Stationary/BG_10k/BarsGaussAN0_10000.csv")[c(TRUE, FALSE), ]
+  TEST_DATASET = read.csv("~/Data\ Stream/DS_Datasets/Synthetic/Stationary/BG_10k/BarsGaussAN0_10000.csv")[c(FALSE, TRUE), ]
   
+  ########################################Para o KDD_99CUp############################################
+  #drops <- c("tcp","http","SF","X0.1","X1","X0.14","X0.15") #Variáveis simbólicas a serem deletadas #
+  #TRAINING_DATASET<-TRAINING_DATASET[ , !(names(TRAINING_DATASET) %in% drops)]                      #
+  #TEST_DATASET<-TEST_DATASET[ , !(names(TEST_DATASET) %in% drops)]                                  #  
+  ####################################################################################################
   TRAINING_SET_SIZE <-nrow(TRAINING_DATASET)    #Quantidade de instacias no dataset de treino
   TEST_SET_SIZE <-nrow(TEST_DATASET)            #Quantidade de instancia no dataset de teste
+  
+  
   NATTRIBUTES <- ncol(TRAINING_DATASET) -1      #Calcula quantidade de atributos presentes no dataset
   
   #----------------------------------------------Variáveis de inicializacao do algoritmo-----------------------------------------------------------------------------------------
-  INITNUMBER <- 500            #Quantidade inicial de pontos que serão utilizados na criacao dos micro-grupos iniciais  
+  INITNUMBER <- 400            #Quantidade inicial de pontos que serão utilizados na criacao dos micro-grupos iniciais  
   MICROCLUSTER_RATIO <- 5      #Quantidade de micro-grupos máxima por classe na criacao inicial
-  FRAME_MAX_CAPACITY <- 8      #Quantidade de snapshost por frame
-  BUFFER_SIZE <- 600          #Quantidade de pontos a ser recebida até para q seja feito o teste no fluxo de teste
+  FRAME_MAX_CAPACITY <- 32      #Quantidade de snapshost por frame
+  BUFFER_SIZE <- 1600          #Quantidade de pontos a ser recebida até para q seja feito o teste no fluxo de teste
   KFIT <- 200                  #Quantidade de pontos que serão testadas
   T <- 2                       #Multiplica pela distancia do micro-grupo mais proximo para definir o limite maximo do micro-grupo inicial
   M <- 0.32                    #Porcentagem de ultimos pontos a chegar no micro-grupo
-  POINTS_PER_UNIT_TIME <- 50   #Pontos que chegarao a cada 1 unidade de tempo
+  POINTS_PER_UNIT_TIME <- 80   #Pontos que chegarao a cada 1 unidade de tempo
   MAX_ITERATIONS <- 10         #Quantidade max de iteracoes do algoritmo
-  PHI <- 25*1000                #Limiar para decidir se um mcrogrupo é deletado ou merge
+  PHI <- 512*1000                #Limiar para decidir se um mcrogrupo é deletado ou merge
   P <- 1                       #Quantidade de horizontes para a classificacão
-  STORE_MC <- 1                #Intervalo de tempo para armazenar um snapshot
+  STORE_MC <- 0.25                #Intervalo de tempo para armazenar um snapshot
   
   #-------------------------------------------Variáveis globais inicializadas automaticamente-------------------------------------------------------------------
   FRAME_NUMBER = round(log2(TRAINING_SET_SIZE))      #Quantidade de frames que haverá na tabela geométrica
@@ -33,7 +40,7 @@
   HORIZONS <- 2^(1:FRAME_MAX_CAPACITY)*1000              #Horizontes para verificar os kfit pontos
   
   #------------------------------------------------------Inicializa funcões--------------------------------------------------------------------------------------------
-  source("~/Data\ Stream/Classification/OnDemand/Utils-OnDemand.R")
+  source("~/Data\ Stream/Classifiers/Tiago/On-Demand/Utils-OnDemand.R")
   
   #==============================================================INÍCIO===========================================================================================
   #Fase 1 - Inicializacão - OFFLINE
@@ -53,12 +60,16 @@
   #Utilizar o kmeans em cada grupo de classe e retornar k microgrupos para cada classe
   set.seed(1)
   splitted_microclusters <- lapply(splitted_points, function(class_set){
-                                  c(kmeans(class_set[, 1:NATTRIBUTES], MICROCLUSTER_RATIO, nstart = 5),class=as.character(class_set[1,NATTRIBUTES+1]))
-                             }) 
+                                  if(nrow(class_set) > 0){
+                                    list(cluster = kmeans( class_set[, 1:NATTRIBUTES], MICROCLUSTER_RATIO, nstart = 5),class=class_set[1,NATTRIBUTES+1])
+                                  }else NA
+                             })
+  complete_cases <- !is.na(splitted_microclusters)
+  splitted_microclusters <- splitted_microclusters[complete_cases]
   
   #Sumariza os grupos em micro-grupos
   MICROCLUSTERS <- sapply(splitted_microclusters, function(class_set_mc){
-                         apply(class_set_mc$centers,1,function(center){
+                         apply(class_set_mc$cluster$centers,1,function(center){
                                create.microcluster(center,class_set_mc$class)
                           })                           
                     })
@@ -88,11 +99,11 @@
     while(remaining_points_buffer > 0){
       
       training_points <- get_points(TRAINING_STREAM, n=points_until_store, class = TRUE)
-      
+      points_index <- 0
       #Atualizacao dos micro-gupos
       for(stream_point in get.rows(training_points)){
-       
-        class_stream_point <- as.character(stream_point[NATTRIBUTES+1]) #Classe do ponto
+        points_index <- points_index + 1
+        class_stream_point <- training_points[points_index,NATTRIBUTES+1]    #Classe do ponto
         stream_point <- t(stream_point[1:NATTRIBUTES])                     #Ponto sem a classe
     
         #Calcular distancia do ponto para os microgrupos de sua classe
@@ -116,10 +127,10 @@
       colnames(fmic_classes) <- "class_center"
       fmic <- cbind(fmic_centers,fmic_classes)
       plot_name <-  paste0("~/Data\ Stream/Classification/OnDemand/Graphx/buffer" ,it_point,".jpg")
-      jpeg(plot_name)
-      plot <-ggplot(TRAINING_DATASET[INITNUMBER:it_point,], aes(x=X1,y=X2))+geom_point(aes(color = class))+scale_color_continuous(name="",breaks = c(1, 2, 3),labels = c("1", "2", "3"),low = "yellow", high = "green")+geom_point(data = fmic, aes(x=V1,y=V2),shape=fmic$class_center,color="red")
-      print(plot)
-      dev.off()
+  #    jpeg(plot_name)
+  #    plot <-ggplot(TRAINING_DATASET[INITNUMBER:it_point,], aes(x=X1,y=X2))+geom_point(aes(color = class))+scale_color_continuous(name="",breaks = c(1, 2, 3),labels = c("1", "2", "3"),low = "yellow", high = "green")+geom_point(data = fmic, aes(x=V1,y=V2),shape=fmic$class_center,color="red")
+  #    print(plot)
+  #    dev.off()
       INITNUMBER <- it_point 
       
       #salvar snapshot
@@ -151,7 +162,7 @@
     best_horizons <- get.besthorizons(HORIZONS_FITTING,P)
     test_points <- get_points(TEST_STREAM, n=BUFFER_SIZE+displacement,class = TRUE)
     test_set <- test_points[,-(NATTRIBUTES+1)]
-    labels_test <- test_points[,(NATTRIBUTES+1)]
+    labels_test <- as.character(as.numeric(test_points[,(NATTRIBUTES+1)]))
     horizons_pred <- c()
     
     #calcula o knn para cada p horizon
@@ -159,11 +170,11 @@
       training_set <- horizon$training_set
       training_labels <- horizon$labels
       test_pred <- knn(training_set,test_set,training_labels,k=1)
-      horizons_pred <- cbind(horizons_pred,as.numeric(as.character(test_pred)))
+      horizons_pred <- cbind(horizons_pred,test_pred)
     }
     
     #pegar a classe que mais aparece nos p horizontes resultados para cada exemplo de test
-    prediction <- apply(horizons_pred,1,function(row){as.numeric(names(which.max(table(row))))})
+    prediction <- apply(horizons_pred,1,function(row){names(which.max(table(row)))})
     accuracy_test <- calculate.accuracy(prediction,labels_test)
     cat("Accuracy: ", accuracy_test, "\n")
     #Pega os BUFFER_SIZE+displacement pontos do fluxo de treino para deixa-los no mesmo tempo

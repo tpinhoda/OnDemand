@@ -5,9 +5,9 @@ library(class)
 library(ggplot2)
 library (caret)
 
-MAX_TEST <- 10         #Quantidade max de TESTES do algoritmo
+MAX_TEST <- 1         #Quantidade max de TESTES do algoritmo
 RESULTS_HISTORY <- c()
-
+SUM_RESULTS_HISTORY <- c()
 
 #------------------------------------------------------Variáveis do Dataset--------------------------------------------------------------------------------------
 #Separa o Conjunto de teste e o de treino 1 por 1
@@ -29,6 +29,7 @@ for(teste in 1:MAX_TEST){
 
   source("Ondemand.R")
   RESULTS_HISTORY <- cbind(RESULTS_HISTORY,list(teste = HISTORY))
+  SUM_RESULTS_HISTORY <- cbind(SUM_RESULTS_HISTORY,list(teste = SUM_HISTORY))
 }
 
 cat("OnDemand")

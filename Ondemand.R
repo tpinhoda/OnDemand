@@ -23,6 +23,9 @@
   HORIZONS <- 2^(1:5)*1000              #Horizontes para verificar os kfit pontos
   HORIZONS <- c(c(250,500,1000),HORIZONS)
   HISTORY <- c()
+  SUM_HISTORY <- c()
+  SUM_PREDICTION <- c()
+  SUM_LABELS <- c()
   #------------------------------------------------------Inicializa funcões--------------------------------------------------------------------------------------------
   source("Utils-OnDemand.R")
   
@@ -166,14 +169,22 @@
       prediction <- apply(horizons_pred,1,function(row){names(which.max(table(row)))})
       
       labels_test <- factor(labels_test,levels = class_levels)
+      SUM_LABELS <- c(SUM_LABELS,labels_test)
+      SUM_LABELS <- factor(SUM_LABELS,levels = class_levels)
+      
       prediction <- factor(prediction,levels = class_levels )
+      SUM_PREDICTION <- c(SUM_PREDICTION,prediction)
+      SUM_PREDICTION <- factor(SUM_PREDICTION,levels = class_levels)
+      
       
       confusion_matrix <- confusionMatrix(prediction,labels_test)
-   
+      sum_confusion_matrix <- confusionMatrix(SUM_PREDICTION,SUM_LABELS)
+      
       cat("Accuracy: ", confusion_matrix$overall[1], "Time:",TIME/1000,"\n")
       #Pega os BUFFER_SIZE+displacement pontos do fluxo de treino para deixa-los no mesmo tempo
       displacement <- KFIT
       remaining_points <- remaining_points - (BUFFER_SIZE + KFIT)
       HISTORY <- cbind(HISTORY,list(matrix = confusion_matrix))
+      SUM_HISTORY <- cbind(SUM_HISTORY,list(matrix = sum_confusion_matrix))
     }
   

@@ -249,7 +249,8 @@ calculate.accuracy <- function(y_pred,label){
       right <- right + 1
     index_label <- index_label + 1
   }
-  return(right/index_label)
+
+  return(right/(index_label-1))
 }
 
 get.besthorizons <- function(HORIZONS_FITTING,P){
@@ -260,4 +261,12 @@ get.besthorizons <- function(HORIZONS_FITTING,P){
     best_horizons <- c(best_horizons,list(HORIZONS_FITTING[[index]]))
   }
   return(best_horizons)
+}
+
+snapshot_empty <- function(SNAPSHOTS){
+  for(i in 1:length(SNAPSHOTS)){
+    if(!is.null(SNAPSHOTS[[i]]$frame_slot))
+      return(FALSE)
+  }
+  return(TRUE)
 }

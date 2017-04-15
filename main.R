@@ -1,5 +1,5 @@
 rm(list = ls())
-setwd("~/Data\ Stream/Classifiers/Tiago/On-Demand/")
+setwd("~/Data\ Mining/Data\ Stream/Classification/OnDemand/")
 library(stream)
 library(class)
 library(ggplot2)
@@ -31,5 +31,12 @@ for(teste in 1:MAX_TEST){
   RESULTS_HISTORY <- cbind(RESULTS_HISTORY,list(teste = HISTORY))
   SUM_RESULTS_HISTORY <- cbind(SUM_RESULTS_HISTORY,list(teste = SUM_HISTORY))
 }
+PARAMETERS = c(EXEC = MAX_TEST, DATASET = "BG_10k",INITNUMBER = INITNUMBER, MICROCLUSTER_RATIO = MICROCLUSTER_RATIO, FRAME_MAX_CAPACITY = FRAME_MAX_CAPACITY, BUFFER_SIZE = BUFFER_SIZE, KFIT = KFIT, M = M, POINTS_PER_UNIT_TIME = POINTS_PER_UNIT_TIME, PHI = PHI, P = P, STORE_MC = STORE_MC )
+source("results_evaluate.R")
+#Avaliar resultados
+EVALUATED_RESULTS <- results.evaluate(SUM_RESULTS_HISTORY)
+#Salvar resultados
+saveRDS(PARAMETERS, "Results.Data/parameters.rds")
+saveRDS(EVALUATED_RESULTS,  "Results.Data/results.rds")
 
 cat("OnDemand")

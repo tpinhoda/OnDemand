@@ -13,7 +13,7 @@
   PHI <- 512*1000                #Limiar para decidir se um mcrogrupo é deletado ou merge
   P <- 1                       #Quantidade de horizontes para a classificacão
   STORE_MC <- 0.25                #Intervalo de tempo para armazenar um snapshot
-  
+ 
   #-------------------------------------------Variáveis globais inicializadas automaticamente-------------------------------------------------------------------
   FRAME_NUMBER = round(log2(TRAINING_SET_SIZE))      #Quantidade de frames que haverá na tabela geométrica
   FRAMES = 0:(FRAME_NUMBER-1)                    #Lista dos números dos frames ordenada de forma crescente (0 - framenumber-1)

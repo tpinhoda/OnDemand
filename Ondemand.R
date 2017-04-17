@@ -1,16 +1,16 @@
 
 
   #----------------------------------------------Variáveis de inicializacao do algoritmo-----------------------------------------------------------------------------------------
-  INITNUMBER <- 400             #Quantidade inicial de pontos que serão utilizados na criacao dos micro-grupos iniciais  
+  INITNUMBER <- 100             #Quantidade inicial de pontos que serão utilizados na criacao dos micro-grupos iniciais  
   MICROCLUSTER_RATIO <- 5      #Quantidade de micro-grupos máxima por classe na criacao inicial
   FRAME_MAX_CAPACITY <- 16     #Quantidade de snapshost por frame
-  BUFFER_SIZE <- 500           #Quantidade de pontos a ser recebida até para q seja feito o teste no fluxo de teste
+  BUFFER_SIZE <- 100           #Quantidade de pontos a ser recebida até para q seja feito o teste no fluxo de teste
   KFIT <- 40                    #Quantidade de pontos que serão testadas
   T <- 2                       #Multiplica pela distancia do micro-grupo mais proximo para definir o limite maximo do micro-grupo inicial
-  M <- 0.32                    #Porcentagem de ultimos pontos a chegar no micro-grupo
+  M <- 0.25                    #Porcentagem de ultimos pontos a chegar no micro-grupo
   POINTS_PER_UNIT_TIME <- 40    #Pontos que chegarao a cada 1 unidade de tempo
   
-  PHI <- 512*1000                #Limiar para decidir se um mcrogrupo é deletado ou merge
+  PHI <- 12*1000                #Limiar para decidir se um mcrogrupo é deletado ou merge
   P <- 1                       #Quantidade de horizontes para a classificacão
   STORE_MC <- 0.25                #Intervalo de tempo para armazenar um snapshot
  
@@ -26,6 +26,7 @@
   SUM_HISTORY <- c()
   SUM_PREDICTION <- c()
   SUM_LABELS <- c()
+  TRAINING_HISTORY <- c()
   #------------------------------------------------------Inicializa funcões--------------------------------------------------------------------------------------------
   source("Utils-OnDemand.R")
   
@@ -163,6 +164,7 @@
         training_labels <- horizon$labels
         test_pred <- knn(training_set,test_set,training_labels,k=1)
         horizons_pred <- cbind(horizons_pred,test_pred)
+        TRAINING_HISTORY <- cbind(TRAINING_HISTORY, list(horizon))
       }
       
       #pegar a classe que mais aparece nos p horizontes resultados para cada exemplo de test
@@ -180,7 +182,7 @@
       confusion_matrix <- confusionMatrix(prediction,labels_test)
       sum_confusion_matrix <- confusionMatrix(SUM_PREDICTION,SUM_LABELS)
       
-      cat("Accuracy: ", confusion_matrix$overall[1], "Time:",TIME/1000,"\n")
+      cat("Accuracy: ", sum_confusion_matrix$overall[1], "Time:",TIME/1000,"\n")
       #Pega os BUFFER_SIZE+displacement pontos do fluxo de treino para deixa-los no mesmo tempo
       displacement <- KFIT
       remaining_points <- remaining_points - (BUFFER_SIZE + KFIT)

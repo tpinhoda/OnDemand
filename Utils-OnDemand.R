@@ -230,7 +230,7 @@ relating.microcluster <- function(time,horizon) {
         mc1[[idmc1]]$CF1t <- mc1[[idmc1]]$CF1t - mc2[[idmc2]]$CF1t
         mc1[[idmc1]]$CF2t <- mc1[[idmc1]]$CF2t - mc2[[idmc2]]$CF2t
         mc1[[idmc1]]$n <- mc1[[idmc1]]$n - mc2[[idmc2]]$n
-        mc1[[idmc1]]$CF1t <- setdiff(mc1[[idmc1]]$id,mc2[[idmc2]]$id)
+        mc1[[idmc1]]$id <- setdiff(mc1[[idmc1]]$id,mc2[[idmc2]]$id)
       }  
       idmc2 <- idmc2 + 1
     }

@@ -96,7 +96,25 @@ results.evaluate <- function(R_H){
     #encontrando CER
     CER = (sum((ExC*FPR)/Ex) + sum((ExC*FNR)/Ex)) / 2
     
+    #Encontrando o desvio padrao do CER (Fazendo separado pq fiz depois)
+    dcer = vector(length = exec)
+    for(i in 1:exec){
+      for(t in 1:qtdClass){
+        ExC[t] = sum(Matriz_Chunks[[i]][[chunk]]$table[t,])
+      }
+      Ex = sum(Matriz_Chunks[[i]][[chunk]]$table)
+      FPR = FPR + (1 - Matriz_Chunks[[i]][[chunk]]$byClass[,"Specificity"])
+      FNR = FNR + (1 - Matriz_Chunks[[i]][[chunk]]$byClass[,"Sensitivity"])
+      
+      dcer[i] = (sum((ExC*FPR)/Ex) + sum((ExC*FNR)/Ex)) / 2
+    }
     
+    Dev_CER = sd(dcer)
+    
+    #Caso exec = 1,  Dev_CER vira NA
+    if(is.na(Dev_CER)){
+      Dev_CER = 0
+    }
     
     #Encontrando o Desvio Padrao
     Dev_Sensitivity = sqrt(Dev_Sensitivity / (N-1))
@@ -133,6 +151,7 @@ results.evaluate <- function(R_H){
     lista$overall["Ave_Accuracy"] = Ave_Accuracy
     lista$overall["Dev_Accuracy"] = Dev_Accuracy
     lista$overall["CER"] = CER
+    lista$overall["Dev_CER"] = Dev_CER
     
     # Adiciona lista para a lista resultante
     FINAL_RESULTS[[chunk]] = lista

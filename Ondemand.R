@@ -1,18 +1,18 @@
 
 
   #----------------------------------------------Variáveis de inicializacao do algoritmo-----------------------------------------------------------------------------------------
-  INITNUMBER <- 100             #Quantidade inicial de pontos que serão utilizados na criacao dos micro-grupos iniciais  
-  MICROCLUSTER_RATIO <- 5      #Quantidade de micro-grupos máxima por classe na criacao inicial
-  FRAME_MAX_CAPACITY <- 16     #Quantidade de snapshost por frame
-  BUFFER_SIZE <- 100           #Quantidade de pontos a ser recebida até para q seja feito o teste no fluxo de teste
-  KFIT <- 40                    #Quantidade de pontos que serão testadas
-  T <- 2                       #Multiplica pela distancia do micro-grupo mais proximo para definir o limite maximo do micro-grupo inicial
-  M <- 0.25                    #Porcentagem de ultimos pontos a chegar no micro-grupo
-  POINTS_PER_UNIT_TIME <- 40    #Pontos que chegarao a cada 1 unidade de tempo
+  INITNUMBER <- EXP["INITNUMBER",1]             #Quantidade inicial de pontos que serão utilizados na criacao dos micro-grupos iniciais  
+  MICROCLUSTER_RATIO <- EXP["MICROCLUSTER_RATIO",1]      #Quantidade de micro-grupos máxima por classe na criacao inicial
+  FRAME_MAX_CAPACITY <- EXP["FRAME_MAX_CAPACITY",1]     #Quantidade de snapshost por frame
+  BUFFER_SIZE <- EXP["BUFFER_SIZE",]           #Quantidade de pontos a ser recebida até para q seja feito o teste no fluxo de teste
+  KFIT <- EXP["KFIT",1]                    #Quantidade de pontos que serão testadas
+  T <- EXP["T",1]                       #Multiplica pela distancia do micro-grupo mais proximo para definir o limite maximo do micro-grupo inicial
+  M <- EXP["M",1]                    #Porcentagem de ultimos pontos a chegar no micro-grupo
+  POINTS_PER_UNIT_TIME <- EXP["POINTS_PER_UNIT_TIME",1]    #Pontos que chegarao a cada 1 unidade de tempo
   
-  PHI <- 12*1000                #Limiar para decidir se um mcrogrupo é deletado ou merge
-  P <- 1                       #Quantidade de horizontes para a classificacão
-  STORE_MC <- 0.25                #Intervalo de tempo para armazenar um snapshot
+  PHI <- EXP["PHI",1]                #Limiar para decidir se um mcrogrupo é deletado ou merge
+  P <- EXP["P",1]                       #Quantidade de horizontes para a classificacão
+  STORE_MC <- EXP["STORE_MC",1]                #Intervalo de tempo para armazenar um snapshot
  
   #-------------------------------------------Variáveis globais inicializadas automaticamente-------------------------------------------------------------------
   FRAME_NUMBER = round(log2(TRAINING_SET_SIZE))      #Quantidade de frames que haverá na tabela geométrica
@@ -27,6 +27,7 @@
   SUM_PREDICTION <- c()
   SUM_LABELS <- c()
   TRAINING_HISTORY <- c()
+  miss = 0
   #------------------------------------------------------Inicializa funcões--------------------------------------------------------------------------------------------
   source("Utils-OnDemand.R")
   
@@ -162,6 +163,10 @@
       for(horizon in best_horizons){
         training_set <- horizon$training_set
         training_labels <- horizon$labels
+        training_classes <- as.numeric(names(table(training_labels)))
+        if(length(training_classes) < nclass){
+          miss = miss + 1
+        }
         test_pred <- knn(training_set,test_set,training_labels,k=1)
         horizons_pred <- cbind(horizons_pred,test_pred)
         TRAINING_HISTORY <- cbind(TRAINING_HISTORY, list(horizon))

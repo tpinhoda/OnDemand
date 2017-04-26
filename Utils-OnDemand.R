@@ -206,7 +206,7 @@ find.snapshot <- function(t){
   while(t >= 0){
     for(fr in FRAMES+1){
       snaps <- 1
-      while(snaps < length(SNAPSHOTS[[fr]]$frame_slot)){
+      while(snaps <= length(SNAPSHOTS[[fr]]$frame_slot)){
         if(SNAPSHOTS[[fr]]$frame_slot[[snaps]]$time == t){
           return(SNAPSHOTS[[fr]]$frame_slot[[snaps]]$MICROCLUSTERS)
         }

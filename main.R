@@ -7,7 +7,7 @@
   library (caret)
   
   #lendo entrada para experimentos
-  EXP = read.csv("exp_1.csv", row.names = 1)
+  EXP = read.csv("Experiments/exp_1.csv", row.names = 1)
   MAX_TEST <- EXP["MAX_TEST",1]         #Quantidade max de TESTES do algoritmo
   NAME_EXP <- colnames(EXP)
   

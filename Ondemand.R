@@ -165,7 +165,7 @@
         training_labels <- horizon$labels
         training_classes <- as.numeric(names(table(training_labels)))
         if(length(training_classes) < nclass){
-          miss = miss + 1
+          miss = miss + (nclass - length(names(table(training_labels))) )
         }
         test_pred <- knn(training_set,test_set,training_labels,k=1)
         horizons_pred <- cbind(horizons_pred,test_pred)

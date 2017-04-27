@@ -1,13 +1,13 @@
-  rm(list = ls())
-  #Setando o diretorio-
-  setwd("~/Data\ Stream/Classifiers/Tiago/On-Demand/")
-  library(stream)
-  library(class)
-  library(ggplot2)
-  library (caret)
-  
-  #lendo entrada para experimentos
-  EXP = read.csv("Experiments/exp_1.csv", row.names = 1)
+  # rm(list = ls())
+  # #Setando o diretorio-
+  # setwd("~/Data\ Stream/Classifiers/Tiago/On-Demand/")
+  # library(stream)
+  # library(class)
+  # library(ggplot2)
+  # library (caret)
+  # 
+  # #lendo entrada para experimentos
+  # EXP = read.csv("Experiments/exp_3.csv", row.names = 1)
   MAX_TEST <- EXP["MAX_TEST",1]         #Quantidade max de TESTES do algoritmo
   NAME_EXP <- colnames(EXP)
   
@@ -18,11 +18,12 @@
   #------------------------------------------------------Variáveis do Dataset--------------------------------------------------------------------------------------
   #Lendo os caminhos para os DataSets
   ds = as.matrix(read.csv("DataSet_Path.csv"))
-  DS_NAME = strsplit(strsplit(ds[EXP["DataSet",1]],"/")[[1]][5],".csv")[[1]]
+  #mudar o numero do ds
+  DS_NAME = strsplit(strsplit(ds[base],"/")[[1]][5],".csv")[[1]]
   
   #Separa o Conjunto de teste e o de treino 1 por 1
-  TRAINING_DATASET = read.csv(ds[EXP["DataSet",1]])[c(TRUE, FALSE), ]
-  TEST_DATASET = read.csv(ds[EXP["DataSet",1]])[c(FALSE, TRUE), ]
+  TRAINING_DATASET = read.csv(ds[base])[c(TRUE, FALSE), ]
+  TEST_DATASET = read.csv(ds[base])[c(FALSE, TRUE), ]
   colnames(TRAINING_DATASET) <- c("x","y","class")
   colnames(TEST_DATASET) <- c("x","y","class")
   
@@ -52,8 +53,9 @@
     SUM_RESULTS_HISTORY <- cbind(SUM_RESULTS_HISTORY,list(teste = SUM_HISTORY))
     MISS_HISTORY <- cbind(MISS_HISTORY,miss)
   }
-  dir.create("Results_Buffers",showWarnings = FALSE)
-  pdf(paste("Results_Buffers/OnDemand_Buffers_",NAME_EXP,".pdf",sep=""))
+  dir <- paste0("Results_Buffers/",DS_NAME)
+  dir.create(dir,showWarnings = FALSE)
+  pdf(paste(dir,"/On-Demand_Buffers_",NAME_EXP,".pdf",sep=""))
   
   TRAINING_INDEX <- INITNUMBER
   for(chunk in 1:length(HISTORY)){
@@ -80,11 +82,12 @@
   source("results_evaluate.R")
   #Avaliar resultados
   EVALUATED_RESULTS <- results.evaluate(SUM_RESULTS_HISTORY)
-  dir.create("Results.Data",showWarnings = FALSE)
+  dir <- paste0("Results.Data/",DS_NAME)
+  dir.create(dir,showWarnings = FALSE)
   #Salvar resultados
-  saveRDS(PARAMETERS, paste("Results.Data/",NAME_EXP,"_Parameters.rds",sep=""))
-  saveRDS(EVALUATED_RESULTS,  paste("Results.Data/",NAME_EXP,"_Results.rds",sep=""))
-  saveRDS(SUM_RESULTS_HISTORY,  paste("Results.Data/",NAME_EXP,"_SumResults.rds",sep=""))
-  
+  saveRDS(PARAMETERS, paste(dir,"/",NAME_EXP,"_Parameters.rds",sep=""))
+  saveRDS(EVALUATED_RESULTS,  paste(dir,"/",NAME_EXP,"_Results.rds",sep=""))
+  saveRDS(SUM_RESULTS_HISTORY,  paste(dir,"/",NAME_EXP,"_SumResults.rds",sep=""))
+  saveRDS(MISS_HISTORY, paste(dir,"/",NAME_EXP,"_miss_history.rds",sep=""))
   cat("OnDemand")
  
